@@ -79,12 +79,16 @@ class BeanDefinitionLoader {
 		Assert.notNull(registry, "Registry must not be null");
 		Assert.notEmpty(sources, "Sources must not be empty");
 		this.sources = sources;
+		// AnnotationConfigServletWebServerApplicationContext也有创建
 		this.annotatedReader = new AnnotatedBeanDefinitionReader(registry);
+		//用于xmlBean定义读取器
 		this.xmlReader = new XmlBeanDefinitionReader(registry);
 		if (isGroovyPresent()) {
 			this.groovyReader = new GroovyBeanDefinitionReader(registry);
 		}
+		// AnnotationConfigServletWebServerApplicationContext也有创建
 		this.scanner = new ClassPathBeanDefinitionScanner(registry);
+		// 排除启动主类，因为在启动的时候扫描过了
 		this.scanner.addExcludeFilter(new ClassExcludeFilter(sources));
 	}
 

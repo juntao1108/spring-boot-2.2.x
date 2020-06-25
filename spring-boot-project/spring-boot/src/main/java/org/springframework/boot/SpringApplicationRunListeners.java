@@ -43,6 +43,7 @@ class SpringApplicationRunListeners {
 	}
 
 	void starting() {
+		// this.listeners是时间发布者，这里只有一个EventPublishingRunListener
 		for (SpringApplicationRunListener listener : this.listeners) {
 			listener.starting();
 		}

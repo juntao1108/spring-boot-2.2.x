@@ -54,6 +54,7 @@ public class EventPublishingRunListener implements SpringApplicationRunListener,
 	public EventPublishingRunListener(SpringApplication application, String[] args) {
 		this.application = application;
 		this.args = args;
+		// 创建一个简单应用事件多路广播器，用于发布应用相关的事件
 		this.initialMulticaster = new SimpleApplicationEventMulticaster();
 		for (ApplicationListener<?> listener : application.getListeners()) {
 			this.initialMulticaster.addApplicationListener(listener);
@@ -67,6 +68,7 @@ public class EventPublishingRunListener implements SpringApplicationRunListener,
 
 	@Override
 	public void starting() {
+		// 发布应用启动事件，ApplicationStartingEvent是事件类型，每种事件都有相对应的事件类
 		this.initialMulticaster.multicastEvent(new ApplicationStartingEvent(this.application, this.args));
 	}
 
@@ -78,6 +80,7 @@ public class EventPublishingRunListener implements SpringApplicationRunListener,
 
 	@Override
 	public void contextPrepared(ConfigurableApplicationContext context) {
+		// 事件类型为应用程序上下文初始化事件
 		this.initialMulticaster
 				.multicastEvent(new ApplicationContextInitializedEvent(this.application, this.args, context));
 	}
@@ -90,6 +93,7 @@ public class EventPublishingRunListener implements SpringApplicationRunListener,
 			}
 			context.addApplicationListener(listener);
 		}
+		// 事件类型为应用程序上下文准备事件
 		this.initialMulticaster.multicastEvent(new ApplicationPreparedEvent(this.application, this.args, context));
 	}
 

@@ -268,9 +268,13 @@ public class SpringApplication {
 		this.resourceLoader = resourceLoader;
 		Assert.notNull(primarySources, "PrimarySources must not be null");
 		this.primarySources = new LinkedHashSet<>(Arrays.asList(primarySources));
+		// 推断web应用程序类型，有三种类型NONE、SERVLET、REACTIVE一般为SERVLET
 		this.webApplicationType = WebApplicationType.deduceFromClasspath();
+		// 获取ApplicationContextInitializer类型的初始化类并实例化成对象后边会用到，从spring.factories文件中获取类路径5个
 		setInitializers((Collection) getSpringFactoriesInstances(ApplicationContextInitializer.class));
+		// 获取ApplicationListener类型的监听器类并实例化成对象后边会用到，从spring.factories文件中获取类路径10个
 		setListeners((Collection) getSpringFactoriesInstances(ApplicationListener.class));
+		// 推断main运行的启动类
 		this.mainApplicationClass = deduceMainApplicationClass();
 	}
 
@@ -301,16 +305,36 @@ public class SpringApplication {
 		ConfigurableApplicationContext context = null;
 		Collection<SpringBootExceptionReporter> exceptionReporters = new ArrayList<>();
 		configureHeadlessProperty();
+		/*
+		 * 从spring.factories获取SpringApplicationRunListener类型的监听器实例化，实际是EventPublishingRunListener
+		 *
+		 * 这里使用观察者模式，前面实例化的监听器会监听这个类发布的事件，不同的事件类型
+		 * 会有会有不同的监听器做不同的事情
+		 */
 		SpringApplicationRunListeners listeners = getRunListeners(args);
+		// 发布应用启动事件，做了应用开始的环境工作
 		listeners.starting();
 		try {
+			// 创建运行使用的参数对象
 			ApplicationArguments applicationArguments = new DefaultApplicationArguments(args);
+			// 准备应用需要的环境
 			ConfigurableEnvironment environment = prepareEnvironment(listeners, applicationArguments);
 			configureIgnoreBeanInfo(environment);
+			// 打印Banner
 			Banner printedBanner = printBanner(environment);
+			// 根据应用类型创建应用程序上下文AnnotationConfigServletWebServerApplicationContext
+			// 注册6个后置处理器到BeanDefinition
+			/*
+			 * 创建bean工厂DefaultListableBeanFactory
+			 * 往工厂中的beanDefinitionMap中添加6个后置处理器的beanDefinition
+			 * 有一个org.springframework.context.annotation.ConfigurationClassPostProcessor
+			 *做了大部分工厂的初始化工作，后面会看到
+			 */
 			context = createApplicationContext();
+			// 从spring.factories获取SpringBootExceptionReporter的子类用于拦截启动时异常
 			exceptionReporters = getSpringFactoriesInstances(SpringBootExceptionReporter.class,
 					new Class[] { ConfigurableApplicationContext.class }, context);
+			// 准备应用程序上下文
 			prepareContext(context, environment, listeners, applicationArguments, printedBanner);
 			refreshContext(context);
 			afterRefresh(context, applicationArguments);
@@ -339,10 +363,13 @@ public class SpringApplication {
 	private ConfigurableEnvironment prepareEnvironment(SpringApplicationRunListeners listeners,
 			ApplicationArguments applicationArguments) {
 		// Create and configure the environment
+		// 根据应用类型创建相对应的环境
 		ConfigurableEnvironment environment = getOrCreateEnvironment();
 		configureEnvironment(environment, applicationArguments.getSourceArgs());
 		ConfigurationPropertySources.attach(environment);
+		// 发布环境准备事件
 		listeners.environmentPrepared(environment);
+		// 环境绑定到应用程序
 		bindToSpringApplication(environment);
 		if (!this.isCustomEnvironment) {
 			environment = new EnvironmentConverter(getClassLoader()).convertEnvironmentIfNecessary(environment,
@@ -366,30 +393,47 @@ public class SpringApplication {
 	private void prepareContext(ConfigurableApplicationContext context, ConfigurableEnvironment environment,
 			SpringApplicationRunListeners listeners, ApplicationArguments applicationArguments, Banner printedBanner) {
 		context.setEnvironment(environment);
+		//
 		postProcessApplicationContext(context);
+		// 回调ApplicationContextInitializer子类的initialize方法，这些类是前面在spring.factiries中加载的
 		applyInitializers(context);
+		// 发布应用程序上下文准备事件
 		listeners.contextPrepared(context);
 		if (this.logStartupInfo) {
 			logStartupInfo(context.getParent() == null);
 			logStartupProfileInfo(context);
 		}
 		// Add boot specific singleton beans
+		// 获取bean工厂DefaultListableBeanFactory
 		ConfigurableListableBeanFactory beanFactory = context.getBeanFactory();
+		// 把对象注册到singletonObjects单例池中
 		beanFactory.registerSingleton("springApplicationArguments", applicationArguments);
 		if (printedBanner != null) {
 			beanFactory.registerSingleton("springBootBanner", printedBanner);
 		}
 		if (beanFactory instanceof DefaultListableBeanFactory) {
+			// 设置相同名字的BeanDefinition是否允许覆盖，这里是否
 			((DefaultListableBeanFactory) beanFactory)
 					.setAllowBeanDefinitionOverriding(this.allowBeanDefinitionOverriding);
 		}
 		if (this.lazyInitialization) {
 			context.addBeanFactoryPostProcessor(new LazyInitializationBeanFactoryPostProcessor());
 		}
-		// Load the sources
+		// Load the sources 启动类
 		Set<Object> sources = getAllSources();
 		Assert.notEmpty(sources, "Sources must not be empty");
+		/*
+		 * this.sources = sources;
+		 * 		this.annotatedReader = new AnnotatedBeanDefinitionReader(registry);
+		 * 		this.xmlReader = new XmlBeanDefinitionReader(registry);
+		 * 		if (isGroovyPresent()) {
+		 * 			this.groovyReader = new GroovyBeanDefinitionReader(registry);
+		 *                }
+		 * 		this.scanner = new ClassPathBeanDefinitionScanner(registry);
+		 * 		this.scanner.addExcludeFilter(new ClassExcludeFilter(sources));
+		 */
 		load(context, sources.toArray(new Object[0]));
+		// 发布应用程序上下文准备事件
 		listeners.contextLoaded(context);
 	}
 
@@ -433,6 +477,7 @@ public class SpringApplication {
 	private <T> List<T> createSpringFactoriesInstances(Class<T> type, Class<?>[] parameterTypes,
 			ClassLoader classLoader, Object[] args, Set<String> names) {
 		List<T> instances = new ArrayList<>(names.size());
+		// 使用反射实例化对象
 		for (String name : names) {
 			try {
 				Class<?> instanceClass = ClassUtils.forName(name, classLoader);
